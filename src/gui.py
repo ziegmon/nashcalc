@@ -672,6 +672,7 @@ class NashCalculatorGUI:
             self.status_var.set(f"Failed to simplify defender strategy: {str(e)}")
 
     def display_simplified_result(self, result, player, original_ev):
+        self.result_text.config(state=tk.NORMAL)
         attacker_moves, defender_moves, attacker_probs, defender_probs, simplified_ev = result
         self.result_text.delete(1.0, tk.END)
         title = f"Simplified {'Attacker' if player == 'attacker' else 'Defender'} Strategy"
@@ -710,11 +711,16 @@ class NashCalculatorGUI:
             simplified_n = len(defender_moves)
             self.result_text.insert(tk.END, f"\nDefender Moves Reduced: {original_n_defender} → {simplified_n}\n", "item")
 
+        self.result_text.config(state=tk.DISABLED)
+
     def display_result(self, result, title="Mixed Strategy Nash Equilibrium"):
+        self.result_text.config(state=tk.NORMAL)
         self.result_text.delete(1.0, tk.END)
+
         if isinstance(result, str):
             self.result_text.insert(tk.END, result)
             return
+        
         attacker_moves, defender_moves, attacker_probs, defender_probs, game_value = result
         self.result_text.insert(tk.END, f"{title}\n\n", "title")
         self.result_text.insert(tk.END, "Attacker Strategies:\n", "header")
@@ -728,3 +734,5 @@ class NashCalculatorGUI:
             self.result_text.insert(tk.END, f"  {move}: ", "item")
             self.result_text.insert(tk.END, f"{100*prob:6.2f}%\n", tag)
         self.result_text.insert(tk.END, f"\nExpected Payoff: {game_value:6.4f}\n", "value_active")
+
+        self.result_text.config(state=tk.DISABLED)
