@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, filedialog
 import numpy as np
-from game_logic import calculate_mixed_nash, calculate_attacker_best_response, calculate_defender_best_response, calculate_qre_attacker, calculate_qre_defender
+from game_logic import calculate_mixed_nash
 from data_handler import save_to_file, load_from_file
 
 class NashCalculatorGUI:
@@ -23,16 +23,13 @@ class NashCalculatorGUI:
         menu_bar.add_cascade(label="File", menu=file_menu)
         file_menu.add_command(label="Save Scenario", command=self.save_scenario)
         file_menu.add_command(label="Load Scenario", command=self.load_scenario)
-        edit_menu = tk.Menu(menu_bar, tearoff=0)
-        menu_bar.add_cascade(label="Edit", menu=edit_menu)
-        edit_menu.add_command(label="Make Binary", command=self.make_binary)
 
         self.input_frame = ttk.Frame(root, padding="10")
         self.input_frame.grid(row=0, column=0, sticky="nsew")
         self.result_frame = ttk.Frame(root, padding="10")
         self.result_frame.grid(row=0, column=1, sticky="nsew")
 
-        self.root.columnconfigure(0, weight=1)
+        self.root.columnconfigure(0, weight=50)
         self.root.columnconfigure(1, weight=1)
         self.root.rowconfigure(0, weight=1)
 
@@ -45,14 +42,6 @@ class NashCalculatorGUI:
         self.input_frame.rowconfigure(2, weight=1)
         self.input_frame.rowconfigure(3, weight=1)
         self.input_frame.rowconfigure(7, weight=0)
-
-        self.attacker_lock_var = tk.BooleanVar()
-        self.attacker_lock_check = ttk.Checkbutton(self.input_frame, text="Lock Attacker", variable=self.attacker_lock_var, command=self.toggle_attacker_probs)
-        self.attacker_lock_check.grid(row=0, column=0, padx=5, pady=5, sticky="w")
-
-        self.defender_lock_var = tk.BooleanVar()
-        self.defender_lock_check = ttk.Checkbutton(self.input_frame, text="Lock Defender", variable=self.defender_lock_var, command=self.toggle_defender_probs)
-        self.defender_lock_check.grid(row=1, column=0, padx=5, pady=5, sticky="w")
 
         self.moves_canvas = tk.Canvas(self.input_frame)
         moves_scrollbar = ttk.Scrollbar(self.input_frame, orient="vertical", command=self.moves_canvas.yview)
@@ -78,36 +67,19 @@ class NashCalculatorGUI:
         self.threshold_spinbox.delete(0, tk.END)
         self.threshold_spinbox.insert(0, "10")
 
-        ttk.Label(self.input_frame, text="Exploit Weight:").grid(row=6, column=0, padx=5, pady=5, sticky="w")
-        self.exploit_spinbox = tk.Spinbox(self.input_frame, from_=0, to=1, increment=0.1, width=5)
-        self.exploit_spinbox.grid(row=6, column=1, padx=5, pady=5, sticky="w")
-        self.exploit_spinbox.delete(0, tk.END)
-        self.exploit_spinbox.insert(0, "0.3")
-
-        ttk.Label(self.input_frame, text="QRE Lambda:").grid(row=7, column=0, padx=5, pady=5, sticky="w")
-        self.lambda_spinbox = tk.Spinbox(self.input_frame, from_=0.1, to=20, increment=1, width=5)
-        self.lambda_spinbox.grid(row=7, column=1, padx=5, pady=5, sticky="w")
-        self.lambda_spinbox.delete(0, tk.END)
-        self.lambda_spinbox.insert(0, "15.0")
-
         button_frame = ttk.Frame(self.input_frame)
         button_frame.grid(row=8, column=0, columnspan=2, pady=10, sticky="ew")
+        # add more columns for buttons here when needed
         button_frame.columnconfigure(0, weight=1)
         button_frame.columnconfigure(1, weight=1)
         button_frame.columnconfigure(2, weight=1)
         button_frame.columnconfigure(3, weight=1)
-        button_frame.columnconfigure(4, weight=1)
-        button_frame.columnconfigure(5, weight=1)
-        button_frame.columnconfigure(6, weight=1)
 
         buttons = [
             ("Calculate Nash", self.calculate),
-            ("Best Response", self.calculate_best_response),
-            ("Subtle Exploit", self.calculate_subtle_exploit),
             ("Simplify Attacker", self.simplify_attacker_strategy),
             ("Simplify Defender", self.simplify_defender_strategy),
-            ("Set QRE Attacker", self.set_qre_attacker),
-            ("Set QRE Defender", self.set_qre_defender)
+            ("Make Binary", self.make_binary)
         ]
         for i, (text, command) in enumerate(buttons):
             btn = ttk.Button(button_frame, text=text, command=command)
@@ -116,8 +88,6 @@ class NashCalculatorGUI:
         self.attacker_entries = []
         self.defender_entries = []
         self.payoff_entries = []
-        self.attacker_prob_entries = []
-        self.defender_prob_entries = []
         self.attacker_delete_buttons = []
         self.defender_delete_buttons = []
         self.update_inputs()
@@ -133,7 +103,7 @@ class NashCalculatorGUI:
         self.result_text.tag_configure("header", font=("Arial", 11, "bold"), foreground="#34495e")
         self.result_text.tag_configure("item", font=("Arial", 10), foreground="#333333")
         self.result_text.tag_configure("value_active", font=("Arial", 10, "bold"), foreground="#2980b9")
-        self.result_text.tag_configure("value_inactive", font=("Arial", 10), foreground="#7f8c8d")
+        self.result_text.tag_configure("value_inactive", font=("Arial", 8), foreground="#7f8c8d")
         self.result_frame.columnconfigure(0, weight=1)
         self.result_frame.rowconfigure(1, weight=1)
 
@@ -150,8 +120,6 @@ class NashCalculatorGUI:
         self.attacker_entries = []
         self.defender_entries = []
         self.payoff_entries = []
-        self.attacker_prob_entries = []
-        self.defender_prob_entries = []
         self.attacker_delete_buttons = []
         self.defender_delete_buttons = []
 
@@ -162,7 +130,6 @@ class NashCalculatorGUI:
             old_payoffs = ["0"] * expected_payoffs
 
         ttk.Label(self.moves_frame, text="Attacker Moves:").grid(row=0, column=0, padx=5, pady=2)
-        ttk.Label(self.moves_frame, text="Prob (%)").grid(row=0, column=2, padx=5, pady=2)
         for i, move in enumerate(old_attacker_moves):
             entry = ttk.Entry(self.moves_frame, width=15)
             entry.grid(row=i+1, column=0, padx=5, pady=2)
@@ -173,17 +140,10 @@ class NashCalculatorGUI:
             delete_btn.grid(row=i+1, column=1, padx=2, pady=2)
             self.attacker_delete_buttons.append(delete_btn)
 
-            prob_entry = ttk.Entry(self.moves_frame, width=8)
-            prob_entry.grid(row=i+1, column=2, padx=2, pady=2)
-            prob_entry.insert(0, "0")
-            prob_entry.config(state="disabled" if not self.attacker_lock_var.get() else "normal")
-            self.attacker_prob_entries.append(prob_entry)
-
         self.attacker_add_button = ttk.Button(self.moves_frame, text="+", command=self.add_attacker_move)
         self.attacker_add_button.grid(row=n_attacker+1, column=0, padx=5, pady=5)
 
         ttk.Label(self.moves_frame, text="Defender Moves:").grid(row=0, column=3, padx=5, pady=2)
-        ttk.Label(self.moves_frame, text="Prob (%)").grid(row=0, column=5, padx=5, pady=2)
         for i, move in enumerate(old_defender_moves):
             entry = ttk.Entry(self.moves_frame, width=15)
             entry.grid(row=i+1, column=3, padx=5, pady=2)
@@ -194,19 +154,15 @@ class NashCalculatorGUI:
             delete_btn.grid(row=i+1, column=4, padx=2, pady=2)
             self.defender_delete_buttons.append(delete_btn)
 
-            prob_entry = ttk.Entry(self.moves_frame, width=8)
-            prob_entry.grid(row=i+1, column=5, padx=2, pady=2)
-            prob_entry.insert(0, "0")
-            prob_entry.config(state="disabled" if not self.defender_lock_var.get() else "normal")
-            self.defender_prob_entries.append(prob_entry)
-
         self.defender_add_button = ttk.Button(self.moves_frame, text="+", command=self.add_defender_move)
         self.defender_add_button.grid(row=n_defender+1, column=3, padx=5, pady=5)
 
         for j, move in enumerate(old_defender_moves):
             ttk.Label(self.matrix_frame, text=move, wraplength=60).grid(row=0, column=j+1, padx=2, pady=2)
+
         for i in range(n_attacker):
             ttk.Label(self.matrix_frame, text=old_attacker_moves[i], wraplength=60).grid(row=i+1, column=0, padx=2, pady=2, sticky="e")
+
             for j in range(n_defender):
                 entry = ttk.Entry(self.matrix_frame, width=12)
                 entry.grid(row=i+1, column=j+1, padx=2, pady=2)
@@ -232,16 +188,6 @@ class NashCalculatorGUI:
 
         self.update_inputs(new_payoffs=payoffs, attacker_moves=attacker_moves, defender_moves=defender_moves)
 
-    def toggle_attacker_probs(self):
-        state = "normal" if self.attacker_lock_var.get() else "disabled"
-        for entry in self.attacker_prob_entries:
-            entry.config(state=state)
-
-    def toggle_defender_probs(self):
-        state = "normal" if self.defender_lock_var.get() else "disabled"
-        for entry in self.defender_prob_entries:
-            entry.config(state=state)
-
     def add_attacker_move(self):
         n_attacker = len(self.attacker_entries)
         n_defender = len(self.defender_entries)
@@ -257,12 +203,6 @@ class NashCalculatorGUI:
         delete_btn = ttk.Button(self.moves_frame, text="X", width=2, command=lambda x=n_attacker: self.delete_attacker_move(x))
         delete_btn.grid(row=n_attacker+1, column=1, padx=2, pady=2)
         self.attacker_delete_buttons.append(delete_btn)
-
-        prob_entry = ttk.Entry(self.moves_frame, width=8)
-        prob_entry.grid(row=n_attacker+1, column=2, padx=2, pady=2)
-        prob_entry.insert(0, "0")
-        prob_entry.config(state="disabled" if not self.attacker_lock_var.get() else "normal")
-        self.attacker_prob_entries.append(prob_entry)
 
         for j in range(n_defender):
             entry = ttk.Entry(self.matrix_frame, width=12)
@@ -303,12 +243,6 @@ class NashCalculatorGUI:
         delete_btn.grid(row=n_defender+1, column=4, padx=2, pady=2)
         self.defender_delete_buttons.append(delete_btn)
 
-        prob_entry = ttk.Entry(self.moves_frame, width=8)
-        prob_entry.grid(row=n_defender+1, column=5, padx=2, pady=2)
-        prob_entry.insert(0, "0")
-        prob_entry.config(state="disabled" if not self.defender_lock_var.get() else "normal")
-        self.defender_prob_entries.append(prob_entry)
-
         # Update matrix frame
         old_defender_moves = [entry.get() for entry in self.defender_entries]
         old_attacker_moves = [entry.get() for entry in self.attacker_entries]
@@ -344,7 +278,6 @@ class NashCalculatorGUI:
             payoff_matrix = np.array(old_payoffs).reshape(n_attacker, n_defender)
             new_payoffs = np.delete(payoff_matrix, index, axis=0).flatten().tolist()
             del self.attacker_entries[index]
-            del self.attacker_prob_entries[index]
             del self.attacker_delete_buttons[index]
             self.update_inputs_with_payoffs(new_payoffs)
         except ValueError:
@@ -365,7 +298,6 @@ class NashCalculatorGUI:
             if len(new_payoffs) != expected_length:
                 raise ValueError(f"Payoff length mismatch: expected {expected_length}, got {len(new_payoffs)}")
             del self.defender_entries[index]
-            del self.defender_prob_entries[index]
             del self.defender_delete_buttons[index]
             self.update_inputs_with_payoffs(new_payoffs)
         except ValueError as e:
@@ -388,152 +320,6 @@ class NashCalculatorGUI:
         except Exception as e:
             self.status_var.set(str(e))
 
-    def calculate_best_response(self):
-        try:
-            attacker_moves = [entry.get() for entry in self.attacker_entries]
-            defender_moves = [entry.get() for entry in self.defender_entries]
-            n_attacker = len(attacker_moves)
-            n_defender = len(defender_moves)
-            payoffs = [float(entry.get()) for entry in self.payoff_entries]
-            payoff_matrix = np.array(payoffs).reshape(n_attacker, n_defender)
-            attacker_locked = self.attacker_lock_var.get()
-            defender_locked = self.defender_lock_var.get()
-
-            if attacker_locked and not defender_locked:
-                attacker_probs = [float(entry.get()) / 100 for entry in self.attacker_prob_entries]
-                if abs(sum(attacker_probs) - 1) > 1e-2:
-                    raise ValueError(f"Attacker probabilities sum to {sum(attacker_probs)*100:.2f}%, must be 100%")
-                result = calculate_defender_best_response(attacker_moves, defender_moves, payoff_matrix, attacker_probs)
-                self.display_result(result, title="Best Response (Defender Optimized)")
-            elif defender_locked and not attacker_locked:
-                defender_probs = [float(entry.get()) / 100 for entry in self.defender_prob_entries]
-                if abs(sum(defender_probs) - 1) > 1e-2:
-                    raise ValueError(f"Defender probabilities sum to {sum(defender_probs)*100:.2f}%, must be 100%")
-                result = calculate_attacker_best_response(attacker_moves, defender_moves, payoff_matrix, defender_probs)
-                self.display_result(result, title="Best Response (Attacker Optimized)")
-            else:
-                self.status_var.set("Lock exactly one side for best response")
-        except Exception as e:
-            self.status_var.set(str(e))
-
-    def calculate_subtle_exploit(self):
-        try:
-            attacker_moves = [entry.get() for entry in self.attacker_entries]
-            defender_moves = [entry.get() for entry in self.defender_entries]
-            n_attacker = len(attacker_moves)
-            n_defender = len(defender_moves)
-            payoffs = [float(entry.get()) for entry in self.payoff_entries]
-            payoff_matrix = np.array(payoffs).reshape(n_attacker, n_defender)
-            attacker_locked = self.attacker_lock_var.get()
-            defender_locked = self.defender_lock_var.get()
-
-            nash_result = calculate_mixed_nash(attacker_moves, defender_moves, payoff_matrix)
-            if isinstance(nash_result, str):
-                raise ValueError("Cannot compute Nash for comparison")
-            nash_attacker_probs, nash_defender_probs = nash_result[2], nash_result[3]
-
-            if attacker_locked and not defender_locked:
-                attacker_probs = [float(entry.get()) / 100 for entry in self.attacker_prob_entries]
-                if abs(sum(attacker_probs) - 1) > 1e-2:
-                    raise ValueError(f"Attacker probabilities sum to {sum(attacker_probs)*100:.2f}%, must be 100%")
-                pure_result = calculate_defender_best_response(attacker_moves, defender_moves, payoff_matrix, attacker_probs)
-                if isinstance(pure_result, str):
-                    raise ValueError("Cannot compute pure best response")
-                pure_defender_probs = pure_result[3]
-                exploit_weight = float(self.exploit_spinbox.get())
-                dominant_idx = np.argmax(pure_defender_probs)
-                subtle_defender_probs = nash_defender_probs * (1 - exploit_weight)
-                subtle_defender_probs[dominant_idx] += exploit_weight
-                game_value = np.dot(attacker_probs, np.dot(payoff_matrix, subtle_defender_probs))
-                result = (attacker_moves, defender_moves, np.array(attacker_probs), subtle_defender_probs, game_value)
-                self.display_result(result, title="Subtle Exploit (Defender Adjusted)")
-            elif defender_locked and not attacker_locked:
-                defender_probs = [float(entry.get()) / 100 for entry in self.defender_prob_entries]
-                if abs(sum(defender_probs) - 1) > 1e-2:
-                    raise ValueError(f"Defender probabilities sum to {sum(defender_probs)*100:.2f}%, must be 100%")
-                pure_result = calculate_attacker_best_response(attacker_moves, defender_moves, payoff_matrix, defender_probs)
-                if isinstance(pure_result, str):
-                    raise ValueError("Cannot compute pure best response")
-                pure_attacker_probs = pure_result[2]
-                exploit_weight = float(self.exploit_spinbox.get())
-                dominant_idx = np.argmax(pure_attacker_probs)
-                subtle_attacker_probs = nash_attacker_probs * (1 - exploit_weight)
-                subtle_attacker_probs[dominant_idx] += exploit_weight
-                game_value = np.dot(subtle_attacker_probs, np.dot(payoff_matrix, defender_probs))
-                result = (attacker_moves, defender_moves, subtle_attacker_probs, np.array(defender_probs), game_value)
-                self.display_result(result, title="Subtle Exploit (Attacker Adjusted)")
-            else:
-                self.status_var.set("Lock all moves for exactly one side for subtle exploit")
-        except Exception as e:
-            self.status_var.set(str(e))
-
-    def set_qre_attacker(self):
-        if not self.attacker_lock_var.get():
-            self.status_var.set("Attacker must be locked to set QRE")
-            return
-        try:
-            payoffs = [float(entry.get()) for entry in self.payoff_entries]
-            n_attacker = len(self.attacker_entries)
-            n_defender = len(self.defender_entries)
-            payoff_matrix = np.array(payoffs).reshape(n_attacker, n_defender)
-            lambda_param = float(self.lambda_spinbox.get())
-            attacker_probs = calculate_qre_attacker(payoff_matrix, lambda_param)
-            if np.any(np.isnan(attacker_probs)):
-                raise ValueError("QRE computation failed: Invalid payoff matrix")
-            # Convert to percentages and normalize to sum to 100
-            attacker_percentages = np.array(attacker_probs) * 100
-            total = attacker_percentages.sum()
-            if total == 0:
-                attacker_percentages = np.ones(n_attacker) * (100 / n_attacker)
-            else:
-                attacker_percentages = attacker_percentages * (100 / total)
-            # Round to 3 decimal places and adjust largest probability to ensure sum is 100
-            attacker_percentages = np.round(attacker_percentages, 3)
-            total = attacker_percentages.sum()
-            if total != 100:
-                max_idx = np.argmax(attacker_percentages)
-                attacker_percentages[max_idx] += 100 - total
-            # Log probabilities and sum
-            for i, prob in enumerate(attacker_percentages):
-                self.attacker_prob_entries[i].delete(0, tk.END)
-                self.attacker_prob_entries[i].insert(0, f"{prob:.3f}")
-            self.status_var.set(f"Attacker probabilities set to QRE (lambda={lambda_param})")
-        except Exception as e:
-            self.status_var.set(f"Error setting QRE: {str(e)}")
-
-    def set_qre_defender(self):
-        if not self.defender_lock_var.get():
-            self.status_var.set("Defender must be locked to set QRE")
-            return
-        try:
-            payoffs = [float(entry.get()) for entry in self.payoff_entries]
-            n_attacker = len(self.attacker_entries)
-            n_defender = len(self.defender_entries)
-            payoff_matrix = np.array(payoffs).reshape(n_attacker, n_defender)
-            lambda_param = float(self.lambda_spinbox.get())
-            defender_probs = calculate_qre_defender(payoff_matrix, lambda_param)
-            if np.any(np.isnan(defender_probs)):
-                raise ValueError("QRE computation failed: Invalid payoff matrix")
-            # Convert to percentages and normalize to sum to 100
-            defender_percentages = np.array(defender_probs) * 100
-            total = defender_percentages.sum()
-            if total == 0:
-                defender_percentages = np.ones(n_defender) * (100 / n_defender)
-            else:
-                defender_percentages = defender_percentages * (100 / total)
-            # Round to 3 decimal places and adjust largest probability to ensure sum is 100
-            defender_percentages = np.round(defender_percentages, 3)
-            total = defender_percentages.sum()
-            if total != 100:
-                max_idx = np.argmax(defender_percentages)
-                defender_percentages[max_idx] += 100 - total
-            # Log probabilities and sum
-            for i, prob in enumerate(defender_percentages):
-                self.defender_prob_entries[i].delete(0, tk.END)
-                self.defender_prob_entries[i].insert(0, f"{prob:.3f}")
-            self.status_var.set(f"Defender probabilities set to QRE (lambda={lambda_param})")
-        except Exception as e:
-            self.status_var.set(f"Error setting QRE: {str(e)}")
 
     def save_scenario(self):
         try:
