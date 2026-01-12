@@ -109,6 +109,14 @@ class NashCalculatorGUI:
         self.result_frame.columnconfigure(0, weight=1)
         self.result_frame.rowconfigure(1, weight=1)
 
+    def format_payoff(self, value):
+        try:
+            if isinstance(value, str):
+                value = value.replace(',', '.')
+            return str(int(float(value)))
+        except (ValueError, TypeError):
+            return "0"
+
     def update_inputs(self, new_payoffs=None, attacker_moves=None, defender_moves=None):
         old_attacker_moves = attacker_moves if attacker_moves is not None else [entry.get() for entry in self.attacker_entries] if self.attacker_entries else ["Move 1", "Move 2"]
         old_defender_moves = defender_moves if defender_moves is not None else [entry.get() for entry in self.defender_entries] if self.defender_entries else ["Move 1", "Move 2"]
@@ -177,7 +185,8 @@ class NashCalculatorGUI:
                 entry = ttk.Entry(self.matrix_frame, width=12)
                 entry.grid(row=i+1, column=j+1, padx=2, pady=2)
                 idx = i * n_defender + j
-                entry.insert(0, old_payoffs[idx] if idx < len(old_payoffs) else "0")
+                val = old_payoffs[idx] if idx < len(old_payoffs) else "0"
+                entry.insert(0, self.format_payoff(val))
                 self.payoff_entries.append(entry)
 
         self.moves_frame.update_idletasks()
@@ -275,7 +284,7 @@ class NashCalculatorGUI:
                 entry = ttk.Entry(self.matrix_frame, width=12)
                 entry.grid(row=i+1, column=j+1, padx=2, pady=2)
                 if j < n_defender and i * n_defender + j < len(current_payoffs):
-                    entry.insert(0, current_payoffs[i * n_defender + j])
+                    entry.insert(0, self.format_payoff(current_payoffs[i * n_defender + j]))
                 else:
                     entry.insert(0, "0")
                 self.payoff_entries.append(entry)
