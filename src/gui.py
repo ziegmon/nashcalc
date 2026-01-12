@@ -9,6 +9,11 @@ class NashCalculatorGUI:
         self.root = root
         self.root.title("Fighting Game Nash Equilibrium Calculator")
         self.root.geometry("1000x700")
+        try:
+            icon = tk.PhotoImage(file="src/icon.png")
+            self.root.iconphoto(False, icon)
+        except Exception as e:
+            print(f"Failed to load icon: {e}")
 
         # Status bar
         self.status_var = tk.StringVar()
