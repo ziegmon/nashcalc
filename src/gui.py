@@ -230,7 +230,7 @@ class NashCalculatorGUI:
             entry.insert(0, "0")
             self.payoff_entries.append(entry)
         
-        lbl = ttk.Label(self.matrix_frame, text=entry.get(), wraplength=60)
+        lbl = ttk.Label(self.matrix_frame, text=self.attacker_entries[-1].get(), wraplength=60)
         lbl.grid(row=n_attacker+1, column=0, padx=2, pady=2, sticky="e")
         self.attacker_matrix_labels.append(lbl)
 
