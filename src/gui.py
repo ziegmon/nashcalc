@@ -3,7 +3,6 @@ from tkinter import ttk, filedialog
 import numpy as np
 from game_logic import calculate_mixed_nash
 from data_handler import save_to_file, load_from_file
-from PIL import Image, ImageTk
 import ctypes
 
 class NashCalculatorGUI:
