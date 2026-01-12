@@ -3,15 +3,25 @@ from tkinter import ttk, filedialog
 import numpy as np
 from game_logic import calculate_mixed_nash
 from data_handler import save_to_file, load_from_file
+from PIL import Image, ImageTk
+import ctypes
 
 class NashCalculatorGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Fighting Game Nash Equilibrium Calculator")
         self.root.geometry("1000x700")
+
+        # Set AppUserModelID for taskbar icon
         try:
-            icon = tk.PhotoImage(file="src/icon.png")
-            self.root.iconphoto(False, icon)
+            myappid = 'nashcalc.gui.1.0'
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+        except Exception as e:
+            print(f"Failed to set AppUserModelID: {e}")
+
+        # Load .ico for window and taskbar
+        try:
+            self.root.iconbitmap("src/icon.ico")
         except Exception as e:
             print(f"Failed to load icon: {e}")
 
