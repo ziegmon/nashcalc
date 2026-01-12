@@ -90,6 +90,8 @@ class NashCalculatorGUI:
         self.payoff_entries = []
         self.attacker_delete_buttons = []
         self.defender_delete_buttons = []
+        self.attacker_matrix_labels = []
+        self.defender_matrix_labels = []
         self.update_inputs()
 
         self.moves_frame.bind("<Configure>", lambda e: self.moves_canvas.configure(scrollregion=self.moves_canvas.bbox("all")))
@@ -122,6 +124,8 @@ class NashCalculatorGUI:
         self.payoff_entries = []
         self.attacker_delete_buttons = []
         self.defender_delete_buttons = []
+        self.attacker_matrix_labels = []
+        self.defender_matrix_labels = []
 
         n_attacker = len(old_attacker_moves)
         n_defender = len(old_defender_moves)
@@ -134,6 +138,7 @@ class NashCalculatorGUI:
             entry = ttk.Entry(self.moves_frame, width=15)
             entry.grid(row=i+1, column=0, padx=5, pady=2)
             entry.insert(0, move)
+            entry.bind("<KeyRelease>", lambda e, idx=i: self.update_attacker_label(idx, e))
             self.attacker_entries.append(entry)
 
             delete_btn = ttk.Button(self.moves_frame, text="X", width=2, command=lambda x=i: self.delete_attacker_move(x))
@@ -148,6 +153,7 @@ class NashCalculatorGUI:
             entry = ttk.Entry(self.moves_frame, width=15)
             entry.grid(row=i+1, column=3, padx=5, pady=2)
             entry.insert(0, move)
+            entry.bind("<KeyRelease>", lambda e, idx=i: self.update_defender_label(idx, e))
             self.defender_entries.append(entry)
 
             delete_btn = ttk.Button(self.moves_frame, text="X", width=2, command=lambda x=i: self.delete_defender_move(x))
@@ -158,10 +164,14 @@ class NashCalculatorGUI:
         self.defender_add_button.grid(row=n_defender+1, column=3, padx=5, pady=5)
 
         for j, move in enumerate(old_defender_moves):
-            ttk.Label(self.matrix_frame, text=move, wraplength=60).grid(row=0, column=j+1, padx=2, pady=2)
+            lbl = ttk.Label(self.matrix_frame, text=move, wraplength=60)
+            lbl.grid(row=0, column=j+1, padx=2, pady=2)
+            self.defender_matrix_labels.append(lbl)
 
         for i in range(n_attacker):
-            ttk.Label(self.matrix_frame, text=old_attacker_moves[i], wraplength=60).grid(row=i+1, column=0, padx=2, pady=2, sticky="e")
+            lbl = ttk.Label(self.matrix_frame, text=old_attacker_moves[i], wraplength=60)
+            lbl.grid(row=i+1, column=0, padx=2, pady=2, sticky="e")
+            self.attacker_matrix_labels.append(lbl)
 
             for j in range(n_defender):
                 entry = ttk.Entry(self.matrix_frame, width=12)
@@ -198,6 +208,7 @@ class NashCalculatorGUI:
         entry = ttk.Entry(self.moves_frame, width=15)
         entry.grid(row=n_attacker+1, column=0, padx=5, pady=2)
         entry.insert(0, f"Move {n_attacker+1}")
+        entry.bind("<KeyRelease>", lambda e, idx=n_attacker: self.update_attacker_label(idx, e))
         self.attacker_entries.append(entry)
 
         delete_btn = ttk.Button(self.moves_frame, text="X", width=2, command=lambda x=n_attacker: self.delete_attacker_move(x))
@@ -209,7 +220,10 @@ class NashCalculatorGUI:
             entry.grid(row=n_attacker+1, column=j+1, padx=2, pady=2)
             entry.insert(0, "0")
             self.payoff_entries.append(entry)
-        ttk.Label(self.matrix_frame, text=entry.get(), wraplength=60).grid(row=n_attacker+1, column=0, padx=2, pady=2, sticky="e")
+        
+        lbl = ttk.Label(self.matrix_frame, text=entry.get(), wraplength=60)
+        lbl.grid(row=n_attacker+1, column=0, padx=2, pady=2, sticky="e")
+        self.attacker_matrix_labels.append(lbl)
 
         self.attacker_add_button = ttk.Button(self.moves_frame, text="+", command=self.add_attacker_move)
         self.attacker_add_button.grid(row=n_attacker+2, column=0, padx=5, pady=5)
@@ -237,6 +251,7 @@ class NashCalculatorGUI:
         entry = ttk.Entry(self.moves_frame, width=15)
         entry.grid(row=n_defender+1, column=3, padx=5, pady=2)
         entry.insert(0, f"Move {n_defender+1}")
+        entry.bind("<KeyRelease>", lambda e, idx=n_defender: self.update_defender_label(idx, e))
         self.defender_entries.append(entry)
 
         delete_btn = ttk.Button(self.moves_frame, text="X", width=2, command=lambda x=n_defender: self.delete_defender_move(x))
@@ -246,10 +261,16 @@ class NashCalculatorGUI:
         # Update matrix frame
         old_defender_moves = [entry.get() for entry in self.defender_entries]
         old_attacker_moves = [entry.get() for entry in self.attacker_entries]
+        self.defender_matrix_labels = []
+        self.attacker_matrix_labels = []
         for j, move in enumerate(old_defender_moves):
-            ttk.Label(self.matrix_frame, text=move, wraplength=60).grid(row=0, column=j+1, padx=2, pady=2)
+            lbl = ttk.Label(self.matrix_frame, text=move, wraplength=60)
+            lbl.grid(row=0, column=j+1, padx=2, pady=2)
+            self.defender_matrix_labels.append(lbl)
         for i in range(n_attacker):
-            ttk.Label(self.matrix_frame, text=old_attacker_moves[i], wraplength=60).grid(row=i+1, column=0, padx=2, pady=2, sticky="e")
+            lbl = ttk.Label(self.matrix_frame, text=old_attacker_moves[i], wraplength=60)
+            lbl.grid(row=i+1, column=0, padx=2, pady=2, sticky="e")
+            self.attacker_matrix_labels.append(lbl)
             for j in range(n_defender + 1):
                 entry = ttk.Entry(self.matrix_frame, width=12)
                 entry.grid(row=i+1, column=j+1, padx=2, pady=2)
@@ -273,15 +294,27 @@ class NashCalculatorGUI:
             return
         n_attacker = len(self.attacker_entries)
         n_defender = len(self.defender_entries)
+        
+        old_payoffs = []
+        for entry in self.payoff_entries:
+            try:
+                val = entry.get()
+                if not val:
+                    old_payoffs.append(0.0)
+                else:
+                    val = val.replace(',', '.')
+                    old_payoffs.append(float(val))
+            except ValueError:
+                 old_payoffs.append(0.0)
+        
         try:
-            old_payoffs = [float(entry.get()) for entry in self.payoff_entries]
             payoff_matrix = np.array(old_payoffs).reshape(n_attacker, n_defender)
             new_payoffs = np.delete(payoff_matrix, index, axis=0).flatten().tolist()
             del self.attacker_entries[index]
             del self.attacker_delete_buttons[index]
             self.update_inputs_with_payoffs(new_payoffs)
-        except ValueError:
-            self.status_var.set("Invalid payoff values detected.")
+        except Exception as e:
+            self.status_var.set(f"Error deleting attacker move: {str(e)}")
             self.update_inputs()
 
     def delete_defender_move(self, index):
@@ -290,8 +323,22 @@ class NashCalculatorGUI:
             return
         n_attacker = len(self.attacker_entries)
         n_defender = len(self.defender_entries)
+        
+        old_payoffs = []
+        for entry in self.payoff_entries:
+            try:
+                val = entry.get()
+                if not val:
+                    old_payoffs.append(0.0)
+                else:
+                    # Handle comma vs dot decimal separator if necessary, or just try float
+                    val = val.replace(',', '.')
+                    old_payoffs.append(float(val))
+            except ValueError:
+                 old_payoffs.append(0.0)
+
         try:
-            old_payoffs = [float(entry.get()) for entry in self.payoff_entries]
+            payoff_matrix = np.array(old_payoffs).reshape(n_attacker, n_defender)
             payoff_matrix = np.array(old_payoffs).reshape(n_attacker, n_defender)
             new_payoffs = np.delete(payoff_matrix, index, axis=1).flatten().tolist()
             expected_length = n_attacker * (n_defender - 1)
@@ -306,6 +353,16 @@ class NashCalculatorGUI:
 
     def update_inputs_with_payoffs(self, new_payoffs):
         self.update_inputs(new_payoffs=new_payoffs)
+
+    def update_attacker_label(self, index, event):
+        if 0 <= index < len(self.attacker_entries) and 0 <= index < len(self.attacker_matrix_labels):
+            new_text = self.attacker_entries[index].get()
+            self.attacker_matrix_labels[index].config(text=new_text)
+
+    def update_defender_label(self, index, event):
+        if 0 <= index < len(self.defender_entries) and 0 <= index < len(self.defender_matrix_labels):
+            new_text = self.defender_entries[index].get()
+            self.defender_matrix_labels[index].config(text=new_text)
 
     def calculate(self):
         try:
