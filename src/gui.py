@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog
 import numpy as np
 import os
-from game_logic import calculate_mixed_nash, resolve_scenario_ev, process_scenario_for_comparison, simplify_strategy as solve_simplified_strategy
+from game_logic import calculate_mixed_nash, resolve_scenario_ev, process_scenario_for_comparison, simplify_strategy as solve_simplified_strategy, enumerate_optimal_strategies
 from data_handler import save_to_file, load_from_file
 from sf6_data import SF6_CHARACTERS, DRIVE_MAX, SUPER_MAX, POSITIONS, JAMIE, DRINK_MAX
 import ctypes
@@ -180,6 +180,9 @@ class NashCalculatorGUI:
         for i, (text, command) in enumerate(buttons):
             btn = ttk.Button(button_frame, text=text, command=command)
             btn.grid(row=0, column=i, padx=5, pady=5, sticky="ew")
+
+        alt_btn = ttk.Button(button_frame, text="Alternate Optima", command=self.show_alternate_optima)
+        alt_btn.grid(row=1, column=0, columnspan=4, padx=5, pady=(0, 5), sticky="ew")
 
         self.attacker_entries = []
         self.defender_entries = []
@@ -771,6 +774,54 @@ class NashCalculatorGUI:
             self.display_simplified_result(result[:5], player, result[5])
         except Exception as e:
             self.status_var.set(f"Failed to simplify {player} strategy: {str(e)}")
+
+    def show_alternate_optima(self):
+        try:
+            attacker_moves = [entry.get() for entry in self.attacker_entries]
+            defender_moves = [entry.get() for entry in self.defender_entries]
+            n_attacker, n_defender = len(attacker_moves), len(defender_moves)
+            payoffs = [float(entry.get()) for entry in self.payoff_entries]
+            if len(payoffs) != n_attacker * n_defender:
+                raise ValueError(f"Payoff length mismatch: expected {n_attacker * n_defender}, got {len(payoffs)}")
+            payoff_matrix = np.array(payoffs).reshape(n_attacker, n_defender)
+            atk = enumerate_optimal_strategies(attacker_moves, defender_moves, payoff_matrix, "attacker")
+            dfn = enumerate_optimal_strategies(attacker_moves, defender_moves, payoff_matrix, "defender")
+            if atk is None or dfn is None:
+                raise ValueError("Solver failed")
+            self.display_alternate_optima(attacker_moves, defender_moves, atk, dfn)
+        except Exception as e:
+            self.status_var.set(f"Failed to compute alternate optima: {str(e)}")
+
+    def display_alternate_optima(self, attacker_moves, defender_moves, atk, dfn):
+        self.result_text.config(state=tk.NORMAL)
+        self.result_text.delete(1.0, tk.END)
+        game_value = atk[0] if abs(atk[0]) > 5e-5 else 0.0
+        self.result_text.insert(tk.END, "Alternate Optimal Strategies\n", "title")
+        self.result_text.insert(tk.END, f"{self._context_summary()}\n", "subtitle")
+        self.result_text.insert(tk.END, f"Game Value (EV): {game_value:.4f}  —  all equilibria share this EV\n\n", "item")
+
+        for label, moves, (_, strategies) in (("Attacker", attacker_moves, atk),
+                                              ("Defender", defender_moves, dfn)):
+            count = len(strategies)
+            if count <= 1:
+                self.result_text.insert(tk.END, f"{label}: optimal strategy is unique.\n\n", "header")
+                if count == 1:
+                    self._insert_strategy_line(moves, strategies[0])
+                    self.result_text.insert(tk.END, "\n")
+                continue
+            self.result_text.insert(tk.END, f"{label}: {count} distinct optimal strategies\n", "header")
+            for n, probs in enumerate(strategies, 1):
+                self.result_text.insert(tk.END, f"  #{n}\n", "item")
+                self._insert_strategy_line(moves, probs)
+            self.result_text.insert(tk.END, "\n")
+        self.result_text.config(state=tk.DISABLED)
+
+    def _insert_strategy_line(self, moves, probs):
+        for move, prob in sorted(zip(moves, probs), key=lambda x: x[1], reverse=True):
+            prob = prob if prob > 5e-5 else 0.0   # clamp numerical noise / negative zero
+            tag = "value_active" if prob > 0.005 else "value_inactive"
+            self.result_text.insert(tk.END, f"    {move}: ", "item")
+            self.result_text.insert(tk.END, f"{100*prob:6.2f}%\n", tag)
 
     def display_simplified_result(self, result, player, original_ev):
         self.result_text.config(state=tk.NORMAL)

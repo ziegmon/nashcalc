@@ -28,6 +28,50 @@ def calculate_mixed_nash(attacker_moves, defender_moves, payoff_matrix):
     game_value_optimal = -res_attacker.fun
     return (attacker_moves, defender_moves, attacker_probs_optimal, defender_probs_optimal, game_value_optimal)
 
+def enumerate_optimal_strategies(attacker_moves, defender_moves, payoff_matrix, player,
+                                 tol=1e-6, decimals=3):
+    """Find distinct optimal (maximin/minimax) strategies for one player.
+
+    In a zero-sum game the game value v is unique, but the strategies achieving it
+    form a polytope (the LP's optimal face). This walks that face by pushing each
+    coordinate to its min and max, collecting the distinct vertices — all sharing
+    the same EV = v. Returns (game_value, [prob_vector, ...]) or None on solver
+    failure. A single returned vector means the equilibrium is unique.
+    """
+    nash = calculate_mixed_nash(attacker_moves, defender_moves, payoff_matrix)
+    if isinstance(nash, str):
+        return None
+    v = nash[4]
+
+    if player == "attacker":
+        n = len(attacker_moves)
+        # Optimal face: for every defender column j, (xᵀM)_j >= v  →  -M.T x <= -v
+        A_ub = -payoff_matrix.T
+        b_ub = -(v - tol) * np.ones(payoff_matrix.shape[1])
+    else:
+        n = len(defender_moves)
+        # Optimal face: for every attacker row i, (M y)_i <= v  →  M y <= v
+        A_ub = payoff_matrix
+        b_ub = (v + tol) * np.ones(payoff_matrix.shape[0])
+
+    A_eq = np.ones((1, n))
+    b_eq = [1]
+    bounds = [(0, 1)] * n
+
+    solutions = {}
+    for i in range(n):
+        for sign in (1, -1):          # minimize +x_i, then -x_i (i.e. maximize x_i)
+            c = np.zeros(n)
+            c[i] = sign
+            r = linprog(c, A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq, bounds=bounds)
+            if r.success:
+                key = tuple(np.round(r.x, decimals))
+                solutions.setdefault(key, r.x)
+    if not solutions:
+        return None
+    return v, list(solutions.values())
+
+
 def _raw_payoff(p):
     """Coerce a stored payoff (raw value or {'dmg': ...} link) to a float."""
     if isinstance(p, dict):
