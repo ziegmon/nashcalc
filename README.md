@@ -21,6 +21,11 @@ python -m pip install -r requirements.txt
 python src/main.py
 ```
 ## Usage
+Set Scenario Context:
+- Use the "Scenario Context" panel to record the situation: attacker/defender character (SF6 roster dropdowns), each player's Drive gauge (0–6) and Super meter (0–3) bars, and whether the position is Midscreen or Corner.
+
+- These are labels only — they are saved with the scenario and shown in the results panel and Compare Folder table, but do not affect the Nash calculation.
+
 Set Moves:
 - Add/remove moves.
 

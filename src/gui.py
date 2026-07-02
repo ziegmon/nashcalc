@@ -4,6 +4,7 @@ import numpy as np
 import os
 from game_logic import calculate_mixed_nash, resolve_scenario_ev, process_scenario_for_comparison, simplify_strategy as solve_simplified_strategy
 from data_handler import save_to_file, load_from_file
+from sf6_data import SF6_CHARACTERS, DRIVE_MAX, SUPER_MAX, POSITIONS, JAMIE, DRINK_MAX
 import ctypes
 
 LINKED_BG = "#cce5ff"   # linked-cell background
@@ -17,6 +18,18 @@ class NashCalculatorGUI:
         # flat_idx → {path: str, ev: float, dmg: float}
         self.cell_links = {}
         self.current_file_path = None
+
+        # Scenario context (labels only; no effect on the Nash calculation)
+        default_char = SF6_CHARACTERS[0] if SF6_CHARACTERS else ""
+        self.attacker_char_var = tk.StringVar(value=default_char)
+        self.defender_char_var = tk.StringVar(value=default_char)
+        self.attacker_drive_var = tk.IntVar(value=DRIVE_MAX)
+        self.defender_drive_var = tk.IntVar(value=DRIVE_MAX)
+        self.attacker_super_var = tk.IntVar(value=0)
+        self.defender_super_var = tk.IntVar(value=0)
+        self.attacker_drink_var = tk.IntVar(value=0)
+        self.defender_drink_var = tk.IntVar(value=0)
+        self.position_var = tk.StringVar(value=POSITIONS[0])
 
         try:
             myappid = 'nashcalc.gui.1.0'
@@ -54,8 +67,71 @@ class NashCalculatorGUI:
         self.root.columnconfigure(1, weight=1)
         self.root.rowconfigure(0, weight=1)
 
+        self.create_context_widgets()
         self.create_input_widgets()
         self.create_result_widgets()
+
+    def create_context_widgets(self):
+        ctx = ttk.LabelFrame(self.input_frame, text="Scenario Context", padding="5")
+        ctx.grid(row=0, column=0, columnspan=3, sticky="ew", pady=(0, 5))
+        for c in range(4):
+            ctx.columnconfigure(c, weight=1)
+
+        ttk.Label(ctx, text="Attacker:").grid(row=0, column=0, padx=5, pady=2, sticky="e")
+        atk_cb = ttk.Combobox(ctx, textvariable=self.attacker_char_var, values=SF6_CHARACTERS,
+                              state="readonly", width=14)
+        atk_cb.grid(row=0, column=1, padx=5, pady=2, sticky="w")
+        atk_cb.bind("<<ComboboxSelected>>", lambda e: self._update_drink_visibility())
+        ttk.Label(ctx, text="Defender:").grid(row=0, column=2, padx=5, pady=2, sticky="e")
+        dfn_cb = ttk.Combobox(ctx, textvariable=self.defender_char_var, values=SF6_CHARACTERS,
+                              state="readonly", width=14)
+        dfn_cb.grid(row=0, column=3, padx=5, pady=2, sticky="w")
+        dfn_cb.bind("<<ComboboxSelected>>", lambda e: self._update_drink_visibility())
+
+        ttk.Label(ctx, text="Attacker Drive:").grid(row=1, column=0, padx=5, pady=2, sticky="e")
+        tk.Spinbox(ctx, from_=0, to=DRIVE_MAX, width=4,
+                   textvariable=self.attacker_drive_var).grid(row=1, column=1, padx=5, pady=2, sticky="w")
+        ttk.Label(ctx, text="Defender Drive:").grid(row=1, column=2, padx=5, pady=2, sticky="e")
+        tk.Spinbox(ctx, from_=0, to=DRIVE_MAX, width=4,
+                   textvariable=self.defender_drive_var).grid(row=1, column=3, padx=5, pady=2, sticky="w")
+
+        ttk.Label(ctx, text="Attacker Super:").grid(row=2, column=0, padx=5, pady=2, sticky="e")
+        tk.Spinbox(ctx, from_=0, to=SUPER_MAX, width=4,
+                   textvariable=self.attacker_super_var).grid(row=2, column=1, padx=5, pady=2, sticky="w")
+        ttk.Label(ctx, text="Defender Super:").grid(row=2, column=2, padx=5, pady=2, sticky="e")
+        tk.Spinbox(ctx, from_=0, to=SUPER_MAX, width=4,
+                   textvariable=self.defender_super_var).grid(row=2, column=3, padx=5, pady=2, sticky="w")
+
+        ttk.Label(ctx, text="Position:").grid(row=3, column=0, padx=5, pady=2, sticky="e")
+        pos_frame = ttk.Frame(ctx)
+        pos_frame.grid(row=3, column=1, columnspan=3, padx=5, pady=2, sticky="w")
+        for pos in POSITIONS:
+            ttk.Radiobutton(pos_frame, text=pos, value=pos,
+                            variable=self.position_var).pack(side="left", padx=5)
+
+        # Jamie-only Drink Level (0-4); shown per player only when that player is Jamie.
+        self.attacker_drink_label = ttk.Label(ctx, text="Attacker Drink:")
+        self.attacker_drink_spin = tk.Spinbox(ctx, from_=0, to=DRINK_MAX, width=4,
+                                               textvariable=self.attacker_drink_var)
+        self.defender_drink_label = ttk.Label(ctx, text="Defender Drink:")
+        self.defender_drink_spin = tk.Spinbox(ctx, from_=0, to=DRINK_MAX, width=4,
+                                               textvariable=self.defender_drink_var)
+        self._update_drink_visibility()
+
+    def _update_drink_visibility(self):
+        """Show each player's Drink Level control only when that player is Jamie."""
+        if self.attacker_char_var.get() == JAMIE:
+            self.attacker_drink_label.grid(row=4, column=0, padx=5, pady=2, sticky="e")
+            self.attacker_drink_spin.grid(row=4, column=1, padx=5, pady=2, sticky="w")
+        else:
+            self.attacker_drink_label.grid_remove()
+            self.attacker_drink_spin.grid_remove()
+        if self.defender_char_var.get() == JAMIE:
+            self.defender_drink_label.grid(row=4, column=2, padx=5, pady=2, sticky="e")
+            self.defender_drink_spin.grid(row=4, column=3, padx=5, pady=2, sticky="w")
+        else:
+            self.defender_drink_label.grid_remove()
+            self.defender_drink_spin.grid_remove()
 
     def create_input_widgets(self):
         self.input_frame.columnconfigure(0, weight=1)
@@ -120,12 +196,76 @@ class NashCalculatorGUI:
         self.result_text = tk.Text(self.result_frame, height=20, width=50, font=("Arial", 10), bg="#f0f0f0", relief="flat")
         self.result_text.grid(row=1, column=0, padx=5, pady=5, sticky="nsew")
         self.result_text.tag_configure("title", font=("Arial", 12, "bold"), foreground="#2c3e50", justify="center")
+        self.result_text.tag_configure("subtitle", font=("Arial", 9), foreground="#7f8c8d", justify="center")
         self.result_text.tag_configure("header", font=("Arial", 11, "bold"), foreground="#34495e")
         self.result_text.tag_configure("item", font=("Arial", 10), foreground="#333333")
         self.result_text.tag_configure("value_active", font=("Arial", 10, "bold"), foreground="#2980b9")
         self.result_text.tag_configure("value_inactive", font=("Arial", 8), foreground="#7f8c8d")
         self.result_frame.columnconfigure(0, weight=1)
         self.result_frame.rowconfigure(1, weight=1)
+
+    # ── scenario context ──────────────────────────────────────────────────────
+
+    def _read_context(self):
+        """Read the context widgets into a plain dict for saving. Drink level is
+        recorded only for a player who is Jamie."""
+        ctx = {
+            "attacker_char": self.attacker_char_var.get(),
+            "defender_char": self.defender_char_var.get(),
+            "attacker_drive": self.attacker_drive_var.get(),
+            "defender_drive": self.defender_drive_var.get(),
+            "attacker_super": self.attacker_super_var.get(),
+            "defender_super": self.defender_super_var.get(),
+            "position": self.position_var.get(),
+        }
+        if self.attacker_char_var.get() == JAMIE:
+            ctx["attacker_drink"] = self.attacker_drink_var.get()
+        if self.defender_char_var.get() == JAMIE:
+            ctx["defender_drink"] = self.defender_drink_var.get()
+        return ctx
+
+    def _apply_context(self, ctx):
+        """Populate the context widgets from a saved dict, filling defaults for
+        missing keys so scenarios saved before this feature still load cleanly."""
+        ctx = ctx or {}
+        default_char = SF6_CHARACTERS[0] if SF6_CHARACTERS else ""
+        self.attacker_char_var.set(ctx.get("attacker_char", default_char))
+        self.defender_char_var.set(ctx.get("defender_char", default_char))
+        self.attacker_drive_var.set(ctx.get("attacker_drive", DRIVE_MAX))
+        self.defender_drive_var.set(ctx.get("defender_drive", DRIVE_MAX))
+        self.attacker_super_var.set(ctx.get("attacker_super", 0))
+        self.defender_super_var.set(ctx.get("defender_super", 0))
+        self.attacker_drink_var.set(ctx.get("attacker_drink", 0))
+        self.defender_drink_var.set(ctx.get("defender_drink", 0))
+        self.position_var.set(ctx.get("position", POSITIONS[0]))
+        self._update_drink_visibility()
+
+    def _context_summary(self):
+        """One-line human-readable summary of the current context."""
+        c = self._read_context()
+        summary = (f"{c['attacker_char']} vs {c['defender_char']}  ·  {c['position']}  ·  "
+                   f"Drive {c['attacker_drive']}/{c['defender_drive']}  ·  "
+                   f"Super {c['attacker_super']}/{c['defender_super']}")
+        drinks = [f"{who} {c[key]}" for who, key in (("Attacker", "attacker_drink"),
+                                                     ("Defender", "defender_drink")) if key in c]
+        if drinks:
+            summary += "  ·  Drink " + " ".join(drinks)
+        return summary
+
+    def _default_filename(self):
+        """Suggested save filename derived from the current context, e.g.
+        'Cammy_vs_JP_Corner_D4-6_S0-2'."""
+        c = self._read_context()
+        parts = [f"{c['attacker_char']}_vs_{c['defender_char']}", c['position'],
+                 f"D{c['attacker_drive']}-{c['defender_drive']}",
+                 f"S{c['attacker_super']}-{c['defender_super']}"]
+        if "attacker_drink" in c or "defender_drink" in c:
+            parts.append(f"Drink{c.get('attacker_drink', 0)}-{c.get('defender_drink', 0)}")
+        name = "_".join(parts)
+        # Strip characters that are invalid in filenames on Windows.
+        for ch in ' .<>:"/\\|?*':
+            name = name.replace(ch, "")
+        return name or "scenario"
 
     # ── payoff entry helpers ──────────────────────────────────────────────────
 
@@ -410,7 +550,8 @@ class NashCalculatorGUI:
 
     def save_scenario(self):
         try:
-            file_path = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON files", "*.json")])
+            file_path = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON files", "*.json")],
+                                                     initialfile=self._default_filename())
             if not file_path:
                 return
             base_dir = os.path.dirname(file_path)
@@ -431,7 +572,8 @@ class NashCalculatorGUI:
                 "defender_moves": [entry.get() for entry in self.defender_entries],
                 "payoffs": payoffs,
                 "n_attacker": len(self.attacker_entries),
-                "n_defender": len(self.defender_entries)
+                "n_defender": len(self.defender_entries),
+                "context": self._read_context()
             }
             self.current_file_path = file_path
             save_to_file(scenario, file_path)
@@ -463,6 +605,7 @@ class NashCalculatorGUI:
         self.cell_links = new_links
         scenario["payoffs"] = resolved_payoffs
         self.update_inputs_from_scenario(scenario)
+        self._apply_context(scenario.get("context"))
         name = os.path.splitext(os.path.basename(file_path))[0]
         self.status_var.set(f"Loaded: {name}")
 
@@ -509,6 +652,7 @@ class NashCalculatorGUI:
                 rows.append({
                     "folder":   rel_dir,
                     "scenario": name,
+                    "context":  data.get("context_str", ""),
                     "ev":       data["ev"],
                     "strategy": data["strategy_str"],
                     "path":     file_path,
@@ -537,10 +681,11 @@ class NashCalculatorGUI:
         tree_frame.rowconfigure(0, weight=1)
 
         col_config = {
-            "folder":   ("Folder",                       180, "w"),
-            "scenario": ("Scenario",                     160, "w"),
+            "folder":   ("Folder",                       160, "w"),
+            "scenario": ("Scenario",                     150, "w"),
+            "context":  ("Context",                      160, "w"),
             "ev":       ("EV",                            70, "e"),
-            "strategy": ("Simplified Attacker Strategy", 580, "w"),
+            "strategy": ("Simplified Attacker Strategy", 500, "w"),
         }
         cols = list(col_config.keys())
         tree = ttk.Treeview(tree_frame, columns=cols, show="headings", selectmode="browse")
@@ -564,6 +709,7 @@ class NashCalculatorGUI:
                 iid = tree.insert("", "end", values=(
                     row["folder"],
                     row["scenario"],
+                    row["context"],
                     f"{row['ev']:.2f}",
                     row["strategy"],
                 ))
@@ -631,7 +777,8 @@ class NashCalculatorGUI:
         attacker_moves, defender_moves, attacker_probs, defender_probs, simplified_ev = result
         self.result_text.delete(1.0, tk.END)
         title = f"Simplified {'Attacker' if player == 'attacker' else 'Defender'} Strategy"
-        self.result_text.insert(tk.END, f"{title}\n\n", "title")
+        self.result_text.insert(tk.END, f"{title}\n", "title")
+        self.result_text.insert(tk.END, f"{self._context_summary()}\n\n", "subtitle")
         attacker_data = sorted(zip(attacker_moves, attacker_probs), key=lambda x: x[1], reverse=True)
         sorted_attacker_moves, sorted_attacker_probs = zip(*attacker_data)
         self.result_text.insert(tk.END, "Attacker Strategies (Sorted by Frequency):\n", "header")
@@ -676,7 +823,8 @@ class NashCalculatorGUI:
             return
 
         attacker_moves, defender_moves, attacker_probs, defender_probs, game_value = result
-        self.result_text.insert(tk.END, f"{title}\n\n", "title")
+        self.result_text.insert(tk.END, f"{title}\n", "title")
+        self.result_text.insert(tk.END, f"{self._context_summary()}\n\n", "subtitle")
         self.result_text.insert(tk.END, "Attacker Strategies:\n", "header")
         for move, prob in sorted(zip(attacker_moves, attacker_probs), key=lambda x: x[1], reverse=True):
             tag = "value_active" if prob > 0 else "value_inactive"

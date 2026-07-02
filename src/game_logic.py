@@ -128,4 +128,18 @@ def process_scenario_for_comparison(file_path, threshold_percent=10):
     simp_moves, simp_probs, original_ev = result[0], result[2], result[5]
     pairs = sorted(zip(simp_moves, simp_probs), key=lambda x: x[1], reverse=True)
     strategy_str = "  ·  ".join(f"{m} {p*100:.0f}%" for m, p in pairs if p > 0.005)
-    return {"ev": original_ev, "strategy_str": strategy_str}
+    return {"ev": original_ev, "strategy_str": strategy_str,
+            "context_str": format_context_summary(scenario.get("context"))}
+
+
+def format_context_summary(context):
+    """Compact one-line summary of a saved scenario context dict, or "" if absent."""
+    if not context:
+        return ""
+    parts = []
+    atk, dfn = context.get("attacker_char"), context.get("defender_char")
+    if atk or dfn:
+        parts.append(f"{atk or '?'} vs {dfn or '?'}")
+    if context.get("position"):
+        parts.append(context["position"])
+    return "  ·  ".join(parts)
