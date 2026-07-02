@@ -204,6 +204,7 @@ class NashCalculatorGUI:
         self.result_text.tag_configure("item", font=("Arial", 10), foreground="#333333")
         self.result_text.tag_configure("value_active", font=("Arial", 10, "bold"), foreground="#2980b9")
         self.result_text.tag_configure("value_inactive", font=("Arial", 8), foreground="#7f8c8d")
+        self.result_text.tag_configure("warn", font=("Arial", 10, "bold"), foreground="#e67e22")
         self.result_frame.columnconfigure(0, weight=1)
         self.result_frame.rowconfigure(1, weight=1)
 
@@ -547,7 +548,12 @@ class NashCalculatorGUI:
             payoffs = [float(entry.get()) for entry in self.payoff_entries]
             payoff_matrix = np.array(payoffs).reshape(n_attacker, n_defender)
             result = calculate_mixed_nash(attacker_moves, defender_moves, payoff_matrix)
-            self.display_result(result, title="Mixed Strategy Nash Equilibrium")
+            atk = enumerate_optimal_strategies(attacker_moves, defender_moves, payoff_matrix, "attacker")
+            dfn = enumerate_optimal_strategies(attacker_moves, defender_moves, payoff_matrix, "defender")
+            attacker_alt = len(atk[1]) if atk else None
+            defender_alt = len(dfn[1]) if dfn else None
+            self.display_result(result, title="Mixed Strategy Nash Equilibrium",
+                                attacker_alt=attacker_alt, defender_alt=defender_alt)
         except Exception as e:
             self.status_var.set(str(e))
 
@@ -865,7 +871,8 @@ class NashCalculatorGUI:
             self.result_text.insert(tk.END, f"\nDefender Moves Reduced: {original_n_defender} → {simplified_n}\n", "item")
         self.result_text.config(state=tk.DISABLED)
 
-    def display_result(self, result, title="Mixed Strategy Nash Equilibrium"):
+    def display_result(self, result, title="Mixed Strategy Nash Equilibrium",
+                       attacker_alt=None, defender_alt=None):
         self.result_text.config(state=tk.NORMAL)
         self.result_text.delete(1.0, tk.END)
 
@@ -887,5 +894,15 @@ class NashCalculatorGUI:
             self.result_text.insert(tk.END, f"  {move}: ", "item")
             self.result_text.insert(tk.END, f"{100*prob:6.2f}%\n", tag)
         self.result_text.insert(tk.END, f"\nExpected Payoff: {game_value:6.4f}\n", "value_active")
+
+        alts = [(label, n) for label, n in (("Attacker", attacker_alt), ("Defender", defender_alt))
+                if n is not None and n > 1]
+        if alts:
+            detail = ", ".join(f"{label} {n}" for label, n in alts)
+            self.result_text.insert(tk.END,
+                f"\n⚠ Multiple optimal strategies exist ({detail}).\n"
+                "   Press 'Alternate Optima' to see them.\n", "warn")
+        elif attacker_alt is not None and defender_alt is not None:
+            self.result_text.insert(tk.END, "\nEquilibrium is unique.\n", "item")
 
         self.result_text.config(state=tk.DISABLED)
