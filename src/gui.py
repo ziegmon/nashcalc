@@ -1,10 +1,10 @@
 import tkinter as tk
-from tkinter import ttk, filedialog
+from tkinter import ttk, filedialog, messagebox
 import numpy as np
 import os
 from game_logic import calculate_mixed_nash, resolve_scenario_ev, process_scenario_for_comparison, simplify_strategy as solve_simplified_strategy, enumerate_optimal_strategies
 from data_handler import save_to_file, load_from_file
-from sf6_data import SF6_CHARACTERS, DRIVE_MAX, SUPER_MAX, POSITIONS, JAMIE, DRINK_MAX
+from sf6_data import SF6_CHARACTERS, POSITIONS, JAMIE, DRINK_MAX
 import ctypes
 
 LINKED_BG = "#cce5ff"   # linked-cell background
@@ -21,10 +21,13 @@ class NashCalculatorGUI:
 
         # Scenario context (labels only; no effect on the Nash calculation)
         default_char = SF6_CHARACTERS[0] if SF6_CHARACTERS else ""
-        self.attacker_char_var = tk.StringVar(value=default_char)
-        self.defender_char_var = tk.StringVar(value=default_char)
-        self.attacker_drive_var = tk.IntVar(value=DRIVE_MAX)
-        self.defender_drive_var = tk.IntVar(value=DRIVE_MAX)
+        self.scenario_name_var = tk.StringVar(value="")
+        self.role_var = tk.StringVar(value="Attacker")
+        self.my_char_var = tk.StringVar(value=default_char)
+        self.opponent_chars = []
+        self.opponent_chars_var = tk.StringVar(value="")
+        self.attacker_drive_var = tk.IntVar(value=1)
+        self.defender_drive_var = tk.IntVar(value=1)
         self.attacker_super_var = tk.IntVar(value=0)
         self.defender_super_var = tk.IntVar(value=0)
         self.attacker_drink_var = tk.IntVar(value=0)
@@ -53,6 +56,7 @@ class NashCalculatorGUI:
         self.root.config(menu=menu_bar)
         file_menu = tk.Menu(menu_bar, tearoff=0)
         menu_bar.add_cascade(label="File", menu=file_menu)
+        file_menu.add_command(label="New Scenario", command=self.new_scenario)
         file_menu.add_command(label="Save Scenario", command=self.save_scenario)
         file_menu.add_command(label="Load Scenario", command=self.load_scenario)
         file_menu.add_separator()
@@ -77,34 +81,43 @@ class NashCalculatorGUI:
         for c in range(4):
             ctx.columnconfigure(c, weight=1)
 
-        ttk.Label(ctx, text="Attacker:").grid(row=0, column=0, padx=5, pady=2, sticky="e")
-        atk_cb = ttk.Combobox(ctx, textvariable=self.attacker_char_var, values=SF6_CHARACTERS,
-                              state="readonly", width=14)
-        atk_cb.grid(row=0, column=1, padx=5, pady=2, sticky="w")
-        atk_cb.bind("<<ComboboxSelected>>", lambda e: self._update_drink_visibility())
-        ttk.Label(ctx, text="Defender:").grid(row=0, column=2, padx=5, pady=2, sticky="e")
-        dfn_cb = ttk.Combobox(ctx, textvariable=self.defender_char_var, values=SF6_CHARACTERS,
-                              state="readonly", width=14)
-        dfn_cb.grid(row=0, column=3, padx=5, pady=2, sticky="w")
-        dfn_cb.bind("<<ComboboxSelected>>", lambda e: self._update_drink_visibility())
+        ttk.Label(ctx, text="Name:").grid(row=0, column=0, padx=5, pady=2, sticky="e")
+        ttk.Entry(ctx, textvariable=self.scenario_name_var).grid(
+            row=0, column=1, columnspan=3, padx=5, pady=2, sticky="ew")
 
-        ttk.Label(ctx, text="Attacker Drive:").grid(row=1, column=0, padx=5, pady=2, sticky="e")
-        tk.Spinbox(ctx, from_=0, to=DRIVE_MAX, width=4,
-                   textvariable=self.attacker_drive_var).grid(row=1, column=1, padx=5, pady=2, sticky="w")
-        ttk.Label(ctx, text="Defender Drive:").grid(row=1, column=2, padx=5, pady=2, sticky="e")
-        tk.Spinbox(ctx, from_=0, to=DRIVE_MAX, width=4,
-                   textvariable=self.defender_drive_var).grid(row=1, column=3, padx=5, pady=2, sticky="w")
+        ttk.Label(ctx, text="I play:").grid(row=1, column=0, padx=5, pady=2, sticky="e")
+        role_frame = ttk.Frame(ctx)
+        role_frame.grid(row=1, column=1, padx=5, pady=2, sticky="w")
+        for role in ("Attacker", "Defender"):
+            ttk.Radiobutton(role_frame, text=role, value=role, variable=self.role_var,
+                            command=self._update_drink_visibility).pack(side="left")
 
-        ttk.Label(ctx, text="Attacker Super:").grid(row=2, column=0, padx=5, pady=2, sticky="e")
-        tk.Spinbox(ctx, from_=0, to=SUPER_MAX, width=4,
-                   textvariable=self.attacker_super_var).grid(row=2, column=1, padx=5, pady=2, sticky="w")
-        ttk.Label(ctx, text="Defender Super:").grid(row=2, column=2, padx=5, pady=2, sticky="e")
-        tk.Spinbox(ctx, from_=0, to=SUPER_MAX, width=4,
-                   textvariable=self.defender_super_var).grid(row=2, column=3, padx=5, pady=2, sticky="w")
+        ttk.Label(ctx, text="My Character:").grid(row=1, column=2, padx=5, pady=2, sticky="e")
+        my_cb = ttk.Combobox(ctx, textvariable=self.my_char_var, values=SF6_CHARACTERS,
+                             state="readonly", width=14)
+        my_cb.grid(row=1, column=3, padx=5, pady=2, sticky="w")
+        my_cb.bind("<<ComboboxSelected>>", lambda e: self._update_drink_visibility())
 
-        ttk.Label(ctx, text="Position:").grid(row=3, column=0, padx=5, pady=2, sticky="e")
+        ttk.Label(ctx, text="Opponent(s):").grid(row=2, column=0, padx=5, pady=2, sticky="e")
+        opp_frame = ttk.Frame(ctx)
+        opp_frame.grid(row=2, column=1, columnspan=3, padx=5, pady=2, sticky="w")
+        ttk.Entry(opp_frame, textvariable=self.opponent_chars_var, state="readonly",
+                  width=40).pack(side="left")
+        ttk.Button(opp_frame, text="Edit...", command=self._edit_opponents).pack(side="left", padx=(5, 0))
+
+        ttk.Label(ctx, text="Attacker Drive:").grid(row=3, column=0, padx=5, pady=2, sticky="e")
+        tk.Checkbutton(ctx, variable=self.attacker_drive_var).grid(row=3, column=1, padx=5, pady=2, sticky="w")
+        ttk.Label(ctx, text="Defender Drive:").grid(row=3, column=2, padx=5, pady=2, sticky="e")
+        tk.Checkbutton(ctx, variable=self.defender_drive_var).grid(row=3, column=3, padx=5, pady=2, sticky="w")
+
+        ttk.Label(ctx, text="Attacker Super:").grid(row=4, column=0, padx=5, pady=2, sticky="e")
+        tk.Checkbutton(ctx, variable=self.attacker_super_var).grid(row=4, column=1, padx=5, pady=2, sticky="w")
+        ttk.Label(ctx, text="Defender Super:").grid(row=4, column=2, padx=5, pady=2, sticky="e")
+        tk.Checkbutton(ctx, variable=self.defender_super_var).grid(row=4, column=3, padx=5, pady=2, sticky="w")
+
+        ttk.Label(ctx, text="Position:").grid(row=5, column=0, padx=5, pady=2, sticky="e")
         pos_frame = ttk.Frame(ctx)
-        pos_frame.grid(row=3, column=1, columnspan=3, padx=5, pady=2, sticky="w")
+        pos_frame.grid(row=5, column=1, columnspan=3, padx=5, pady=2, sticky="w")
         for pos in POSITIONS:
             ttk.Radiobutton(pos_frame, text=pos, value=pos,
                             variable=self.position_var).pack(side="left", padx=5)
@@ -119,19 +132,47 @@ class NashCalculatorGUI:
         self._update_drink_visibility()
 
     def _update_drink_visibility(self):
-        """Show each player's Drink Level control only when that player is Jamie."""
-        if self.attacker_char_var.get() == JAMIE:
-            self.attacker_drink_label.grid(row=4, column=0, padx=5, pady=2, sticky="e")
-            self.attacker_drink_spin.grid(row=4, column=1, padx=5, pady=2, sticky="w")
+        """Show each player's Drink Level control only when that player is (or could be) Jamie."""
+        my_is_attacker = self.role_var.get() == "Attacker"
+        attacker_is_jamie = self.my_char_var.get() == JAMIE if my_is_attacker else JAMIE in self.opponent_chars
+        defender_is_jamie = JAMIE in self.opponent_chars if my_is_attacker else self.my_char_var.get() == JAMIE
+        if attacker_is_jamie:
+            self.attacker_drink_label.grid(row=6, column=0, padx=5, pady=2, sticky="e")
+            self.attacker_drink_spin.grid(row=6, column=1, padx=5, pady=2, sticky="w")
         else:
             self.attacker_drink_label.grid_remove()
             self.attacker_drink_spin.grid_remove()
-        if self.defender_char_var.get() == JAMIE:
-            self.defender_drink_label.grid(row=4, column=2, padx=5, pady=2, sticky="e")
-            self.defender_drink_spin.grid(row=4, column=3, padx=5, pady=2, sticky="w")
+        if defender_is_jamie:
+            self.defender_drink_label.grid(row=5, column=2, padx=5, pady=2, sticky="e")
+            self.defender_drink_spin.grid(row=6, column=3, padx=5, pady=2, sticky="w")
         else:
             self.defender_drink_label.grid_remove()
             self.defender_drink_spin.grid_remove()
+
+    def _edit_opponents(self):
+        """Multi-select dialog for the opponent character list."""
+        win = tk.Toplevel(self.root)
+        win.title("Select Opponent(s)")
+        win.transient(self.root)
+        win.grab_set()
+
+        listbox = tk.Listbox(win, selectmode="multiple", exportselection=False, height=16)
+        for i, char in enumerate(SF6_CHARACTERS):
+            listbox.insert(tk.END, char)
+            if char in self.opponent_chars:
+                listbox.selection_set(i)
+        listbox.pack(padx=10, pady=10, fill="both", expand=True)
+
+        def confirm():
+            self.opponent_chars = [SF6_CHARACTERS[i] for i in listbox.curselection()]
+            self.opponent_chars_var.set(", ".join(self.opponent_chars))
+            self._update_drink_visibility()
+            win.destroy()
+
+        btn_frame = ttk.Frame(win)
+        btn_frame.pack(pady=(0, 10))
+        ttk.Button(btn_frame, text="OK", command=confirm).pack(side="left", padx=5)
+        ttk.Button(btn_frame, text="Cancel", command=win.destroy).pack(side="left", padx=5)
 
     def create_input_widgets(self):
         self.input_frame.columnconfigure(0, weight=1)
@@ -212,19 +253,25 @@ class NashCalculatorGUI:
 
     def _read_context(self):
         """Read the context widgets into a plain dict for saving. Drink level is
-        recorded only for a player who is Jamie."""
+        recorded only for a player who is (or could be) Jamie."""
+        my_char = self.my_char_var.get()
+        role = self.role_var.get()
         ctx = {
-            "attacker_char": self.attacker_char_var.get(),
-            "defender_char": self.defender_char_var.get(),
+            "name": self.scenario_name_var.get(),
+            "role": role,
+            "my_char": my_char,
+            "opponent_chars": list(self.opponent_chars),
             "attacker_drive": self.attacker_drive_var.get(),
             "defender_drive": self.defender_drive_var.get(),
             "attacker_super": self.attacker_super_var.get(),
             "defender_super": self.defender_super_var.get(),
             "position": self.position_var.get(),
         }
-        if self.attacker_char_var.get() == JAMIE:
+        attacker_is_jamie = my_char == JAMIE if role == "Attacker" else JAMIE in self.opponent_chars
+        defender_is_jamie = JAMIE in self.opponent_chars if role == "Attacker" else my_char == JAMIE
+        if attacker_is_jamie:
             ctx["attacker_drink"] = self.attacker_drink_var.get()
-        if self.defender_char_var.get() == JAMIE:
+        if defender_is_jamie:
             ctx["defender_drink"] = self.defender_drink_var.get()
         return ctx
 
@@ -233,10 +280,20 @@ class NashCalculatorGUI:
         missing keys so scenarios saved before this feature still load cleanly."""
         ctx = ctx or {}
         default_char = SF6_CHARACTERS[0] if SF6_CHARACTERS else ""
-        self.attacker_char_var.set(ctx.get("attacker_char", default_char))
-        self.defender_char_var.set(ctx.get("defender_char", default_char))
-        self.attacker_drive_var.set(ctx.get("attacker_drive", DRIVE_MAX))
-        self.defender_drive_var.set(ctx.get("defender_drive", DRIVE_MAX))
+        self.scenario_name_var.set(ctx.get("name", ""))
+        if "my_char" in ctx:
+            self.role_var.set(ctx.get("role", "Attacker"))
+            self.my_char_var.set(ctx.get("my_char", default_char))
+            self.opponent_chars = list(ctx.get("opponent_chars", []))
+        else:
+            # Legacy scenarios stored a fixed attacker/defender character each.
+            self.role_var.set("Attacker")
+            self.my_char_var.set(ctx.get("attacker_char", default_char))
+            defender_char = ctx.get("defender_char", default_char)
+            self.opponent_chars = [defender_char] if defender_char else []
+        self.opponent_chars_var.set(", ".join(self.opponent_chars))
+        self.attacker_drive_var.set(int(bool(ctx.get("attacker_drive", 1))))
+        self.defender_drive_var.set(int(bool(ctx.get("defender_drive", 1))))
         self.attacker_super_var.set(ctx.get("attacker_super", 0))
         self.defender_super_var.set(ctx.get("defender_super", 0))
         self.attacker_drink_var.set(ctx.get("attacker_drink", 0))
@@ -247,9 +304,11 @@ class NashCalculatorGUI:
     def _context_summary(self):
         """One-line human-readable summary of the current context."""
         c = self._read_context()
-        summary = (f"{c['attacker_char']} vs {c['defender_char']}  ·  {c['position']}  ·  "
-                   f"Drive {c['attacker_drive']}/{c['defender_drive']}  ·  "
-                   f"Super {c['attacker_super']}/{c['defender_super']}")
+        opp_str = "/".join(c["opponent_chars"]) if c["opponent_chars"] else "?"
+        atk, dfn = (c["my_char"], opp_str) if c["role"] == "Attacker" else (opp_str, c["my_char"])
+        summary = (f"{atk} vs {dfn}  ·  {c['position']}  ·  "
+                   f"Drive {'Y' if c['attacker_drive'] else 'N'}/{'Y' if c['defender_drive'] else 'N'}  ·  "
+                   f"Super {'Y' if c['attacker_super'] else 'N'}/{'Y' if c['defender_super'] else 'N'}")
         drinks = [f"{who} {c[key]}" for who, key in (("Attacker", "attacker_drink"),
                                                      ("Defender", "defender_drink")) if key in c]
         if drinks:
@@ -258,11 +317,17 @@ class NashCalculatorGUI:
 
     def _default_filename(self):
         """Suggested save filename derived from the current context, e.g.
-        'Cammy_vs_JP_Corner_D4-6_S0-2'."""
+        'MyName_Cammy_vs_JP_Corner_D4-6_S0-2'. A scenario name, if given, is
+        prepended."""
         c = self._read_context()
-        parts = [f"{c['attacker_char']}_vs_{c['defender_char']}", c['position'],
-                 f"D{c['attacker_drive']}-{c['defender_drive']}",
-                 f"S{c['attacker_super']}-{c['defender_super']}"]
+        opp_str = "-".join(c["opponent_chars"]) if c["opponent_chars"] else "Any"
+        atk, dfn = (c["my_char"], opp_str) if c["role"] == "Attacker" else (opp_str, c["my_char"])
+        parts = []
+        if c.get("name", "").strip():
+            parts.append(c["name"].strip())
+        parts += [f"{atk}_vs_{dfn}", c['position'],
+                  f"D{int(bool(c['attacker_drive']))}-{int(bool(c['defender_drive']))}",
+                  f"S{int(bool(c['attacker_super']))}-{int(bool(c['defender_super']))}"]
         if "attacker_drink" in c or "defender_drink" in c:
             parts.append(f"Drink{c.get('attacker_drink', 0)}-{c.get('defender_drink', 0)}")
         name = "_".join(parts)
@@ -556,6 +621,19 @@ class NashCalculatorGUI:
                                 attacker_alt=attacker_alt, defender_alt=defender_alt)
         except Exception as e:
             self.status_var.set(str(e))
+
+    def new_scenario(self):
+        if not messagebox.askyesno("New Scenario", "Clear the current scenario? Unsaved changes will be lost."):
+            return
+        self.cell_links = {}
+        self.current_file_path = None
+        self._apply_context(None)
+        self.update_inputs(new_payoffs=["0", "0", "0", "0"],
+                           attacker_moves=["Move 1", "Move 2"], defender_moves=["Move 1", "Move 2"])
+        self.result_text.config(state=tk.NORMAL)
+        self.result_text.delete(1.0, tk.END)
+        self.result_text.config(state=tk.DISABLED)
+        self.status_var.set("New scenario")
 
     def save_scenario(self):
         try:

@@ -181,7 +181,13 @@ def format_context_summary(context):
     if not context:
         return ""
     parts = []
-    atk, dfn = context.get("attacker_char"), context.get("defender_char")
+    if "my_char" in context:
+        my_char = context.get("my_char")
+        opponents = context.get("opponent_chars") or []
+        opp_str = "/".join(opponents) if opponents else "?"
+        atk, dfn = (my_char, opp_str) if context.get("role", "Attacker") == "Attacker" else (opp_str, my_char)
+    else:
+        atk, dfn = context.get("attacker_char"), context.get("defender_char")
     if atk or dfn:
         parts.append(f"{atk or '?'} vs {dfn or '?'}")
     if context.get("position"):
