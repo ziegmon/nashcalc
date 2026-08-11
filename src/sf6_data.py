@@ -35,6 +35,7 @@ SF6_CHARACTERS = [
     "Ryu",
     "Sagat",
     "Terry",
+    "Yasmine",
     "Zangief",
 ]
 
